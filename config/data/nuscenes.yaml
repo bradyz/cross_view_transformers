@@ -1,0 +1,31 @@
+dataset: 'nuscenes_generated'           # do not modify :)
+num_classes: 12                         # do not modify :)
+
+# used to get_split
+version: 'v1.0-trainval'                # 'v1.0-mini' for debugging
+dataset_dir: ???
+labels_dir: ???
+
+# used to generate dataset
+cameras: [[0, 1, 2, 3, 4, 5]]
+
+# required for train/eval
+# Takes the form [[i, j, ...], [p, q, ...]]
+# where [i, j, ...] are indices of individual classes (car, truck, ...),
+# and will be grouped into one semantic class (vehicle).
+label_indices: null                                   
+
+# label parameters
+bev:
+  h: 200
+  w: 200
+  h_meters: 100.0
+  w_meters: 100.0
+  offset: 0.0
+
+# input parameters (not used in label generation)
+augment: 'none'
+image:
+  h: 224
+  w: 480
+  top_crop: 46

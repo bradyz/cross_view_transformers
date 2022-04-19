@@ -1,0 +1,2 @@
+_target_: cross_view_transformer.visualizations.nuscenes_viz.NuScenesViz
+label_indices: ${data.label_indices}

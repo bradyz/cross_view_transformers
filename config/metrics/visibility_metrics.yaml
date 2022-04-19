@@ -1,0 +1,8 @@
+iou:
+  _target_: cross_view_transformer.metrics.IoUMetric
+  label_indices: ${data.label_indices}
+  min_visibility: 2
+
+iou_with_occlusions:
+  _target_: cross_view_transformer.metrics.IoUMetric
+  label_indices: ${data.label_indices}

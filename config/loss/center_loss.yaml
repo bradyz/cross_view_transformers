@@ -1,0 +1,15 @@
+visible_weight: 1.0
+visible:
+  _target_: cross_view_transformer.losses.BinarySegmentationLoss
+
+  label_indices: ${data.label_indices}
+  gamma: 2.0
+  alpha: -1.0
+  min_visibility: 2
+
+center_weight: 0.1
+center:
+  _target_: cross_view_transformer.losses.CenterLoss
+
+  gamma: 2.0
+  min_visibility: 2

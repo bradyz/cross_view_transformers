@@ -1,0 +1,54 @@
+defaults:
+  - _self_
+
+  - model: null
+  - data: ???
+  - visualization: null
+
+  - loss: default_loss
+  - metrics: default_metrics
+
+experiment:
+  project: cross_view_transformers_test               # wandb project
+  uuid: ${now:%m%d_%H%M%S}                            # model name
+  save_dir: ${hydra:runtime.cwd}/logs/                # log directory, will be created
+
+  seed: 2022
+  checkpoint_interval: 1000
+  log_image_interval: 500
+
+loader:
+  batch_size: 4
+  num_workers: 4
+  pin_memory: True
+  prefetch_factor: 4
+
+# AdamW
+optimizer:
+  lr: 4e-3
+  weight_decay: 1e-7
+
+# OneCycleLR
+scheduler:
+  div_factor: 10                                      # starts at lr / 10
+  pct_start: 0.3                                      # reaches lr at 30% of total steps
+  final_div_factor: 10                                # ends at lr / 10 / 10
+  max_lr: ${optimizer.lr}
+  total_steps: ${trainer.max_steps}
+  cycle_momentum: False
+
+# lightning trainer
+trainer:
+  max_steps: 30001
+  log_every_n_steps: 50
+
+  gpus: -1
+  precision: 32
+
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  check_val_every_n_epoch: 1
+  val_check_interval: 1.0
+  num_sanity_val_steps: 0
+  gradient_clip_val: 5.0
+  sync_batchnorm: False
