@@ -132,10 +132,10 @@ class LoadDataTransform(torchvision.transforms.ToTensor):
             image_new = image_new.crop((0, top_crop, image_new.width, image_new.height))
 
             I = np.float32(I_original)
-            I[0, 0] *= w / image.width
-            I[0, 2] *= w / image.width
-            I[1, 1] *= h / image.height
-            I[1, 2] *= h / image.height
+            I[0, 0] *= w_resize / image.width
+            I[0, 2] *= w_resize / image.width
+            I[1, 1] *= h_resize / image.height
+            I[1, 2] *= h_resize / image.height
             I[1, 2] -= top_crop
 
             images.append(self.img_transform(image_new))
