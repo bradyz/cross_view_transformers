@@ -6,8 +6,8 @@ omegaconf==2.1.1
 tqdm==4.63.1
 pyquaternion==0.9.9
 imgaug==0.4.0
-torchmetrics==0.6.2
-pytorch-lightning==1.6.0
+torchmetrics==0.7.2
+pytorch-lightning==1.6.2
 fvcore==0.1.5.post20210825
 einops==0.3.2
 efficientnet-pytorch==0.7.1
