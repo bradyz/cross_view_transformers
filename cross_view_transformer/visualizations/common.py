@@ -104,24 +104,25 @@ class BaseViz:
 
         return result
 
-        h, w, c = pred.shape
+    # def visualize_pred_unused(self, bev, pred, threshold=None):
+    #     h, w, c = pred.shape
 
-        img = np.zeros((h, w, 3), dtype=np.float32)
-        img[...] = 0.5
-        colors = np.float32([
-            [0, .6, 0],
-            [1, .7, 0],
-            [1,  0, 0]
-        ])
-        tp = (pred > threshold) & (bev > threshold)
-        fp = (pred > threshold) & (bev < threshold)
-        fn = (pred <= threshold) & (bev > threshold)
+    #     img = np.zeros((h, w, 3), dtype=np.float32)
+    #     img[...] = 0.5
+    #     colors = np.float32([
+    #         [0, .6, 0],
+    #         [1, .7, 0],
+    #         [1,  0, 0]
+    #     ])
+    #     tp = (pred > threshold) & (bev > threshold)
+    #     fp = (pred > threshold) & (bev < threshold)
+    #     fn = (pred <= threshold) & (bev > threshold)
 
-        for channel in range(c):
-            for i, m in enumerate([tp, fp, fn]):
-                img[m[..., channel]] = colors[i][None]
+    #     for channel in range(c):
+    #         for i, m in enumerate([tp, fp, fn]):
+    #             img[m[..., channel]] = colors[i][None]
 
-        return (255 * img).astype(np.uint8)
+    #     return (255 * img).astype(np.uint8)
 
     def visualize_bev(self, bev):
         """
