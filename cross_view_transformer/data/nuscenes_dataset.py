@@ -11,6 +11,7 @@ from shapely.geometry import MultiPolygon
 from .common import INTERPOLATION, get_view_matrix, get_pose, get_split
 from .transforms import Sample, SaveDataTransform
 
+import ipdb
 
 STATIC = ['lane', 'road_segment']
 DIVIDER = ['road_divider', 'lane_divider']
@@ -139,6 +140,7 @@ class NuScenesDataset(torch.utils.data.Dataset):
             sample_record = self.nusc.get('sample', sample_token)
 
             for camera_rig in camera_rigs:
+                ipdb.set_trace()
                 data.append(self.parse_sample_record(sample_record, camera_rig))
 
             sample_token = sample_record['next']

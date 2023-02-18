@@ -2,9 +2,9 @@ dataset: 'nuscenes_generated'           # do not modify :)
 num_classes: 12                         # do not modify :)
 
 # used to get_split
-version: 'v1.0-trainval'                # 'v1.0-mini' for debugging
-dataset_dir: ???
-labels_dir: ???
+version: 'v1.0-mini'                # 'v1.0-mini' for debugging
+dataset_dir: /srv/share/datasets/nuScenes-v1.0
+labels_dir: /srv/share2/apatni30/cvt_labels_nuscenes_v2
 
 # used to generate dataset
 cameras: [[0, 1, 2, 3, 4, 5]]

@@ -1,7 +1,7 @@
 import json
 import torch
 import pyarrow.feather as feather
-from typing import List
+from typing import List, Tuple
 import numpy as np
 
 from pathlib import Path
@@ -133,7 +133,7 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
                 'images': sensor_data.synchronized_imagery,
             }
 
-    def generate_bev(self, pose: SE3):
+    def generate_bev(self, pose: SE3) -> Tuple[np.ndarray, np.ndarray]:
         xpoints = np.arange(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,self.bev_info['h_meters']/self.bev_info['h'])
         ypoints = np.arange(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,self.bev_info['w_meters']/self.bev_info['w'])
         zpoints = np.array([0,.5,1])
@@ -160,6 +160,8 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
         drivable_area_raster[np.where(static_raster=1)] = 2
         drivable_area_raster[np.where(dynamic_raster=1)] = 3
+
+        # Convert the Driveable Area Raster + Dynamic + Static Map into a BEV Image
         output_bev = xyz_to_bev(
             drivable_area_raster,
             voxel_resolution=(self.bev_info['h'], self.bev_info['w'], 1),
@@ -171,16 +173,13 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
                 3: (30,144,255),
             }
         )
-        return output_bev
+        return output_bev, drivable_area_raster
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
-
-
-        assert bev.shape[2] == 4
 
         # Additional labels for vehicles only.
         aux, visibility = self.get_dynamic_objects(sample, anns_vehicle)
