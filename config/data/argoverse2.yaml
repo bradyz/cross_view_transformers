@@ -3,8 +3,8 @@ num_classes: 12                         # do not modify :)
 
 # used to get_split
 version: 'mini'                # or trainval
-dataset_dir: '/srv/datasets/argoverse2/sensor'
-# labels_dir: ???
+dataset_dir: /srv/datasets/argoverse2/sensor
+labels_dir: /srv/share2/apatni30/cvt_labels_argoverse2
 
 # used to generate dataset
 cameras: [[0, 1, 2, 3, 4, 5]]
