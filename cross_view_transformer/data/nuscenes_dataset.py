@@ -140,7 +140,6 @@ class NuScenesDataset(torch.utils.data.Dataset):
             sample_record = self.nusc.get('sample', sample_token)
 
             for camera_rig in camera_rigs:
-                ipdb.set_trace()
                 data.append(self.parse_sample_record(sample_record, camera_rig))
 
             sample_token = sample_record['next']

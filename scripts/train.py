@@ -68,7 +68,10 @@ def main(cfg):
     # Train
     trainer = pl.Trainer(logger=logger,
                          callbacks=callbacks,
-                         strategy=DDPStrategy(find_unused_parameters=False),
+                         strategy='ddp',
+                         accelerator='cpu',
+                         devices=2,
+                         gpus=1,
                          **cfg.trainer)
     trainer.fit(model_module, datamodule=data_module, ckpt_path=ckpt_path)
 

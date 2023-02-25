@@ -7,7 +7,7 @@ dataset_dir: /srv/datasets/argoverse2/sensor
 labels_dir: /srv/share2/apatni30/cvt_labels_argoverse2
 
 # used to generate dataset
-cameras: [[0, 1, 2, 3, 4, 5]]
+cameras: [[0, 1, 2, 3, 4, 5, 6]]
 
 # required for train/eval
 # Takes the form [[i, j, ...], [p, q, ...]]

@@ -6,6 +6,7 @@ from typing import List, Tuple, Any, Dict
 from PIL import Image
 import numpy as np
 import pandas as pd
+import pickle
 
 from pathlib import Path
 from .common import get_split, INTERPOLATION, get_view_matrix, get_pose
@@ -133,6 +134,8 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
         # for all synchronized scenes get the following data
         self.samples = self.get_samples()
+
+        pickle.dump(self, '/srv/share2/apatni30/tmp/AV2_dataset.pkl')
 
     def get_samples(self) -> List[Dict[str, Any]]:
         data = []
