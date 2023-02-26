@@ -26,7 +26,7 @@ class DataModule(pl.LightningDataModule):
         if loader_config['num_workers'] == 0:
             loader_config['prefetch_factor'] = 2
 
-        return torch.utils.data.DataLoader(dataset, shuffle=shuffle, **loader_config)
+        return torch.utils.data.DataLoader(dataset, shuffle=shuffle, num_workers=1)
 
     def train_dataloader(self, shuffle=True):
         return self.get_split('train', loader=True, shuffle=shuffle)

@@ -134,8 +134,9 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
         # for all synchronized scenes get the following data
         self.samples = self.get_samples()
-
-        pickle.dump(self, '/srv/share2/apatni30/tmp/AV2_dataset.pkl')
+        # with open('/srv/share2/apatni30/tmp/AV2_dataset.pkl', 'wb') as pickle_file:
+        #     pickle.dump(self, pickle_file)
+        #     raise Exception("asdf")
 
     def get_samples(self) -> List[Dict[str, Any]]:
         data = []
@@ -157,11 +158,11 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
             )
         return data
 
-    def generate_bev(self, pose: SE3) -> Tuple[np.ndarray, np.ndarray]:
+    def generate_bev(self, pose: SE3, timestamp: int) -> Tuple[np.ndarray, np.ndarray]:
         pose_inv = pose.inverse()
         xpoints = np.arange(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,self.bev_info['h_meters']/self.bev_info['h'])
         ypoints = np.arange(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,self.bev_info['w_meters']/self.bev_info['w'])
-        zpoints = np.array([0,.5,1])
+        zpoints = np.array([i/10.0 for i in range(20)])
         # xcoord, ycoord, z_coord= np.meshgrid(xpoints, ypoints)
         # xyz_coords = np.concatenate((xcoord, ycoord, z_coord),axis=2)
         # points_xy_city = location.transform_point_cloud(xyz_coords)
@@ -184,14 +185,27 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
 
         for annotation in CuboidList.from_feather(Path(self.log_specific_dataset_path, 'annotations.feather')):
-            _, is_interior = annotation.compute_interior_points(points_xy_wrt_city)                
-            if annotation.category in STATIC:
-                cmap[is_interior] = (255,127,80)
-            elif annotation.category in DYNAMIC:
-                cmap[is_interior] = (30,144,255)
+            if annotation.timestamp_ns == timestamp:
+                annotation = annotation.transform(pose)      
+                _, is_interior = annotation.compute_interior_points(points_xy_wrt_city)          
+                if annotation.category in STATIC:
+                    # print("static")
+                    # print(interior_points)
+                    # print(annotation.dst_SE3_object.translation)
+                    # print(annotation.width_m, annotation.length_m, annotation.height_m)
+                    # print(np.count_nonzero(is_interior))
+                    cmap[is_interior] = (255,127,80)            
+                elif annotation.category in DYNAMIC:
+                    # print("dynamic")
+                    # print(interior_points)
+                    # print(annotation.dst_SE3_object.translation)
+                    # print(annotation.width_m, annotation.length_m, annotation.height_m)
+                    # print(np.count_nonzero(is_interior))
+                    cmap[is_interior] = (30,144,255)
 
 
         # Convert the Driveable Area Raster + Dynamic + Static Map into a BEV Image
+        pdb.set_trace()
         output_bev = xyz_to_bev(
             xyz=points_xy_wrt_city,
             voxel_resolution=(self.bev_info['h'], self.bev_info['w'], 1),
@@ -214,7 +228,7 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         # Package the data.
         data = Sample(
             view=self.view.tolist(),
-            bev=self.generate_bev(sample['pose']),
+            bev=self.generate_bev(sample['pose'], sample['token']),
             # aux=aux,
             # visibility=visibility,
             **sample
