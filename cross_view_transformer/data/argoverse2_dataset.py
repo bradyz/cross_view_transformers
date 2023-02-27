@@ -205,7 +205,6 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
 
         # Convert the Driveable Area Raster + Dynamic + Static Map into a BEV Image
-        pdb.set_trace()
         output_bev = xyz_to_bev(
             xyz=points_xy_wrt_city,
             voxel_resolution=(self.bev_info['h'], self.bev_info['w'], 1),
