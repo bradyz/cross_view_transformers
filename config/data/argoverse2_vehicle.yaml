@@ -4,4 +4,4 @@ defaults:
   - /visualization/nuscenes_viz
 
 data:
-  label_indices: [[0]]
+  label_indices: [[3,4,5,6,9]]

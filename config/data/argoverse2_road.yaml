@@ -3,4 +3,4 @@ defaults:
   - /data/argoverse2
 
 data:
-  label_indices: [[10,14,15,17,19,24,25,26,28,29,30]]  # The 0'th index is the drivable area raster
+  label_indices: [[1,2]] 
