@@ -97,6 +97,7 @@ def get_data(
 ):
     dataset_dir = Path(dataset_dir)
     labels_dir = Path(labels_dir)
+    transform = SaveDataTransform(labels_dir)
 
     log_ids = get_split(f"mini_{split}" if version == "mini" else split, "argoverse2") # TODO: modify for argopaths (actually this seems fine)
 
@@ -110,31 +111,33 @@ def get_data(
         assert Path.exists(Path(dataset_dir, split, log_id))
 
     return [Argoverse2Dataset(
+        data_root=dataset_dir,
         log_id=log_id,
         split=split,
-        log_specific_dataset_path=Path(dataset_dir,split,log_id),
         synchronized_timestamps=
             sensor_dataloader.synchronization_cache.loc[(split, log_id, 'lidar')][['lidar']+[cam.value for cam in tuple(RingCameras)]],
-        transform=SaveDataTransform(labels_dir), # TODO: Transform / SaveDataTransform
+        transform=transform,
         ) for log_id in log_ids]
 
 
 class Argoverse2Dataset(torch.utils.data.Dataset):
     
-    def __init__(self, 
-                    log_id: str, 
-                    split: str,
-                    log_specific_dataset_path: Path,
-                    synchronized_timestamps: pd.DataFrame,
-                    transform=None,
-                    bev={'h': 200, 'w': 200, 'h_meters': 100, 'w_meters': 100, 'offset': 0.0},
+    def __init__(self,
+                data_root: Path,
+                log_id: str, 
+                split: str,
+                synchronized_timestamps: pd.DataFrame,
+                transform=None,
+                bev={'h': 200, 'w': 200, 'h_meters': 100, 'w_meters': 100, 'offset': 0.0},
                 ):
 
         print(f'Argoverse2Dataset building: {log_id}')
+        self.data_root = data_root
         self.log_id = log_id
-        self.log_specific_dataset_path = log_specific_dataset_path
+        self.scene_name = self.log_id
+        self.log_specific_dataset_path = Path(data_root,split,log_id)
         self.poses = read_city_SE3_ego(self.log_specific_dataset_path)
-        self.cameras = [PinholeCamera.from_feather(self.log_specific_dataset_path, cam.value) for cam in tuple(RingCameras)]
+        self.cameras = [PinholeCamera.from_feather(self.log_specific_dataset_path, cam.value) for cam in sorted(list(RingCameras), key=lambda x:x.value)]
         self.avm = ArgoverseStaticMap.from_map_dir(Path(self.log_specific_dataset_path, 'map'), build_raster=True)
         self.synchronized_timestamps = synchronized_timestamps
         self.transform = transform
@@ -142,8 +145,9 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         self.view = get_view_matrix(**bev)
         self.bev_info = bev
         self.bev_shape = (bev['h'], bev['w'])
-        self.intrinsics = {cam.cam_name:cam.intrinsics for cam in self.cameras}
-        self.extrinsics = {cam.cam_name:cam.extrinsics for cam in self.cameras}
+        self.intrinsics = [cam.intrinsics.K for cam in self.cameras]
+        self.extrinsics = [cam.extrinsics for cam in self.cameras]
+
 
         # for all synchronized scenes get the following data
         self.samples = self.get_samples()
@@ -153,19 +157,26 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
     def get_samples(self) -> List[Dict[str, Any]]:
         data = []
+
         for i in range(len(self.synchronized_timestamps)):
             data.append(
                 {
                 'scene': self.log_id,
                 'token': self.synchronized_timestamps.iloc[i]['lidar'].value,
-                'pose': self.poses[self.synchronized_timestamps.iloc[i]['lidar'].value],
+                'pose': self.poses[self.synchronized_timestamps.iloc[i]['lidar'].value].transform_matrix,
                 # 'pose_inverse': self.poses[self.synchronized_timestamps.iloc[i]['lidar'].value].inverse(),
                 'cam_ids': range(0,len(self.cameras)),
                 'cam_channels': [cam.cam_name for cam in self.cameras],
                 'intrinsics': self.intrinsics,
                 'extrinsics': self.extrinsics,
                 'images': [
-                            Path(self.log_specific_dataset_path, 'sensors', 'cameras', camera.cam_name, f'{self.synchronized_timestamps.iloc[i][camera.cam_name].value}.jpg') for camera in self.cameras
+                            str(
+                                Path(
+                                    self.log_specific_dataset_path, 
+                                    'sensors', 'cameras', camera.cam_name, 
+                                    f'{self.synchronized_timestamps.iloc[i][camera.cam_name].value}.jpg'
+                                ).relative_to(self.data_root)
+                            ) for camera in self.cameras
                         ] # these are image paths
                 }
             )
@@ -180,11 +191,11 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         ) -> Tuple[np.ndarray, np.ndarray]:
         """Creates a 2D BEV image from the point cloud.
         
-        Note that the order of layers determines which color is on top
+        Note that the order of layers determines which color is on top (last on top)
 
         Args:
             points (np.ndarray): (N,3)
-            layers_masks (np.ndarray): (L,N)
+            layers_masks (np.ndarray): (L,N) each layer corresponds to a class, where each pixel (n) is a bool
             coloring (Dict[int, Tuple]): Each layer's respective color (r,g,b)
             img_size (Tuple): (height, width)
 
@@ -207,7 +218,6 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         assert abs(min_x) == abs(max_x) 
         assert abs(min_y) == abs(max_y)
         
-
         # Left/Upper Adjust all the points to be in the image coordinate from
         x_points -= min_x
         y_points -= min_y
@@ -226,19 +236,19 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         
         # Build Image and Binary Semantic Segmentation Masks
         im = np.zeros([img_size[0], img_size[1], 3], dtype=np.uint8)
-        binary_semantic_seg = np.zeros((len(coloring), img_size[0], img_size[1]))
+        binary_semantic_seg = np.zeros((img_size[0], img_size[1], len(coloring)), dtype=np.uint8)
 
         # Fill in pixels for image/mask
         for i in range(len(coloring)):
             im[y_img[layers_masks[i]==1], x_img[layers_masks[i]==1]] = coloring[i]
-            binary_semantic_seg[i, y_img[layers_masks[i]==1], x_img[layers_masks[i]==1]] = 1
+            binary_semantic_seg[y_img[layers_masks[i]==1], x_img[layers_masks[i]==1], i] = 1
 
-        return im, binary_semantic_seg
+        return im, 255*binary_semantic_seg
 
 
-    def generate_bev(self, pose: SE3, timestamp: int) -> Tuple[np.ndarray, np.ndarray]:
-        xpoints = np.linspace(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,num=self.bev_info['h'])
-        ypoints = np.linspace(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,num=self.bev_info['w'])
+    def generate_bev(self, pose, timestamp: int) -> Tuple[np.ndarray, np.ndarray]:
+        xpoints = np.linspace(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,num=self.bev_info['h']*2)
+        ypoints = np.linspace(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,num=self.bev_info['w']*2)
         zpoints = np.linspace(-1,4, num=15)
         
         # note: may have to change map() to list() if numpy upgraded >= 1.16
@@ -246,7 +256,6 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         points_xy_wrt_city = pose.transform_point_cloud(points_xy_wrt_src)
         # TODO: consider removing all non-ROI points (assuming everything else works this can save on computation) 
         
-        output = np.zeros((NUM_LAYERS, self.bev_info['h'], self.bev_info['w']))
         layer_masks = np.zeros((NUM_LAYERS, points_xy_wrt_city.shape[0]))
         
         drivable_area_raster = self.avm.raster_drivable_area_layer.get_raster_values_at_coords(points_xy_wrt_city, 0)
@@ -258,9 +267,7 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
                 layer_masks[CLASS_TO_LAYER_INDEX[annotation.category], is_interior] = 1
 
         image_bev, binary_semantic_masks = self.point_cloud_to_bev(points_xy_wrt_src,layer_masks,COLORING,(self.bev_info['h'],self.bev_info['w']))
-
-        Image.save(image_bev, f"/srv/share2/apatni30/cvt_labels_argoverse2/{self.log_id}_{timestamp}.png")
-
+        # Image.fromarray(image_bev, "RGB").save(f"/srv/share2/apatni30/cvt_labels_argoverse2/{self.log_id}_{timestamp}.png")
         return image_bev, binary_semantic_masks
 
     def __len__(self):
@@ -271,7 +278,8 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
         # Additional labels for vehicles only.
         # aux, visibility = self.get_dynamic_objects(sample, anns_vehicle)
-        bev_img, bev_masks = self.generate_bev(sample['pose'], sample['token'])
+        _, bev_masks = self.generate_bev(SE3(sample['pose'][:3, :3],sample['pose'][:3, 3]), sample['token'])
+        print(bev_masks.shape)
         # Package the data.
         data = Sample(
             view=self.view.tolist(),
