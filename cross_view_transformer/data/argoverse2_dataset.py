@@ -252,7 +252,7 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         zpoints = np.linspace(-1,4, num=15)
         
         # note: may have to change map() to list() if numpy upgraded >= 1.16
-        points_xy_wrt_src = np.vstack(map(np.ravel, np.meshgrid(xpoints, ypoints, zpoints))).T
+        points_xy_wrt_src = np.vstack([np.ravel(grid) for grid in np.meshgrid(xpoints, ypoints, zpoints)]).T
         points_xy_wrt_city = pose.transform_point_cloud(points_xy_wrt_src)
         # TODO: consider removing all non-ROI points (assuming everything else works this can save on computation) 
         
