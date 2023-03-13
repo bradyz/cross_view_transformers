@@ -14,6 +14,7 @@ class DataModule(pl.LightningDataModule):
         self.loader_config = loader_config
 
     def get_split(self, split, loader=True, shuffle=False):
+        # print(self.data_config)
         datasets = self.get_data(split=split, **self.data_config)
 
         if not loader:

@@ -10,3 +10,4 @@ outputs/
 .idea
 wandb
 outputs
+*.git

@@ -47,12 +47,14 @@ def setup_data_module(cfg: DictConfig) -> DataModule:
 
 
 def setup_viz(cfg: DictConfig) -> Callable:
+    # return None
     return instantiate(cfg.visualization)
 
 
 def setup_experiment(cfg: DictConfig) -> Tuple[ModelModule, DataModule, Callable]:
     model_module = setup_model_module(cfg)
     data_module = setup_data_module(cfg)
+    viz_fn = None
     viz_fn = setup_viz(cfg)
 
     return model_module, data_module, viz_fn

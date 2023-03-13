@@ -25,10 +25,13 @@ def get_data(
     transform = LoadDataTransform(dataset_dir, labels_dir, image, num_classes, augment)
 
     # Format the split name
-    split = f'mini_{split}' if version == 'v1.0-mini' else split
-    split_scenes = get_split(split, 'argoverse2')
 
-    return [Argoverse2GeneratedDataset(s, labels_dir, transform=transform) for s in split_scenes]
+    # split = f'mini_{split}' if version == 'v1.0-mini' else split
+    # split_scenes = get_split(split, 'argoverse2')
+
+    log_ids = get_split(f"mini_{split}" if version == "mini" else split, "argoverse2")
+
+    return [Argoverse2GeneratedDataset(s, labels_dir, transform=transform) for s in log_ids]
 
 
 class Argoverse2GeneratedDataset(torch.utils.data.Dataset):

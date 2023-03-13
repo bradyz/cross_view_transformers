@@ -145,8 +145,8 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         self.view = get_view_matrix(**bev)
         self.bev_info = bev
         self.bev_shape = (bev['h'], bev['w'])
-        self.intrinsics = [cam.intrinsics.K for cam in self.cameras]
-        self.extrinsics = [cam.extrinsics for cam in self.cameras]
+        self.intrinsics = [cam.intrinsics.K.tolist() for cam in self.cameras]
+        self.extrinsics = [cam.extrinsics.tolist() for cam in self.cameras]
 
 
         # for all synchronized scenes get the following data
@@ -163,9 +163,9 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
                 {
                 'scene': self.log_id,
                 'token': self.synchronized_timestamps.iloc[i]['lidar'].value,
-                'pose': self.poses[self.synchronized_timestamps.iloc[i]['lidar'].value].transform_matrix,
+                'pose': self.poses[self.synchronized_timestamps.iloc[i]['lidar'].value].transform_matrix.tolist(),
                 # 'pose_inverse': self.poses[self.synchronized_timestamps.iloc[i]['lidar'].value].inverse(),
-                'cam_ids': range(0,len(self.cameras)),
+                'cam_ids': list(range(0,len(self.cameras))),
                 'cam_channels': [cam.cam_name for cam in self.cameras],
                 'intrinsics': self.intrinsics,
                 'extrinsics': self.extrinsics,
@@ -245,13 +245,11 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
         return im, 255*binary_semantic_seg
 
-
-    def generate_bev(self, pose, timestamp: int) -> Tuple[np.ndarray, np.ndarray]:
+    def generate_bev(self, pose: SE3, timestamp: int) -> Tuple[np.ndarray, np.ndarray]:
         xpoints = np.linspace(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,num=self.bev_info['h']*2)
         ypoints = np.linspace(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,num=self.bev_info['w']*2)
         zpoints = np.linspace(-1,4, num=15)
         
-        # note: may have to change map() to list() if numpy upgraded >= 1.16
         points_xy_wrt_src = np.vstack([np.ravel(grid) for grid in np.meshgrid(xpoints, ypoints, zpoints)]).T
         points_xy_wrt_city = pose.transform_point_cloud(points_xy_wrt_src)
         # TODO: consider removing all non-ROI points (assuming everything else works this can save on computation) 
@@ -270,6 +268,136 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         # Image.fromarray(image_bev, "RGB").save(f"/srv/share2/apatni30/cvt_labels_argoverse2/{self.log_id}_{timestamp}.png")
         return image_bev, binary_semantic_masks
 
+    def project_3d_point_values_onto_grid(
+        self,
+        points: np.ndarray, # (N,3)
+        mask: np.ndarray, # (N,)
+        values: np.ndarray, # (N,v)
+        grid: np.ndarray    # (200, 200, v)
+    ) -> np.ndarray: # grid
+        assert points.shape[-1] == 3
+        assert points.shape[0] == values.shape[0]
+        assert points.shape[0] == mask.shape[0]
+
+        x_points = points[:, 0].astype(np.float32)
+        y_points = points[:, 1].astype(np.float32)
+
+        min_x = np.min(x_points)
+        min_y = np.min(y_points)
+        max_x = np.max(x_points)
+        max_y = np.max(y_points)
+
+        # Ensures that the grid is equally wide on each side
+        # This is not particularly necessary, but it's a good 
+        # check for this specific use case
+        assert abs(min_x) == abs(max_x) 
+        assert abs(min_y) == abs(max_y)
+        
+        # Left/Upper Adjust all the points to be in the image coordinate from
+        x_points -= min_x
+        y_points -= min_y
+        
+        # Scale the point cloud onto the image plane 
+        res_x = (max_x - min_x)/(grid.shape[1]-1)
+        res_y = (max_y - min_y)/(grid.shape[0]-1)
+
+        x_img = (-y_points / res_y).astype(np.int32)  # x axis is -y in LIDAR
+        y_img = (-x_points / res_x).astype(np.int32)  # y axis is -x in LIDAR
+
+        # Shift Pixels to upper left corner (after division)
+        # floor & ceil used to prevent anything being rounded to below 0 after shift
+        x_img -= int(np.floor(np.min(x_img)))
+        y_img -= int(np.ceil(np.min(y_img)))
+        
+        grid[y_img[mask], x_img[mask]] = values[mask]
+
+        return grid
+
+    def get_aux_labels(self, timestamp: int):
+        xpoints = np.linspace(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,num=self.bev_info['h']*2)
+        ypoints = np.linspace(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,num=self.bev_info['w']*2)
+        zpoints = np.linspace(-1,4, num=15)
+        points_xy_wrt_src = np.vstack([np.ravel(grid) for grid in np.meshgrid(xpoints, ypoints, zpoints)]).T
+        # points_xy_wrt_city = pose.transform_point_cloud(points_xy_wrt_src)
+
+        segmentation = np.zeros((self.bev_info['h'], self.bev_info['w']), dtype=np.uint8)
+        center_score = np.zeros((self.bev_info['h'], self.bev_info['w']), dtype=np.float32)
+        center_offset = np.zeros((self.bev_info['h'], self.bev_info['w'], 2), dtype=np.float32)
+        center_o = np.zeros((self.bev_info['h'], self.bev_info['w'], 2), dtype=np.float32)
+        center_h = np.zeros((self.bev_info['h'], self.bev_info['w']), dtype=np.float32)
+        center_w = np.zeros((self.bev_info['h'], self.bev_info['w']), dtype=np.float32)
+        
+        for annotation in CuboidList.from_feather(Path(self.log_specific_dataset_path, 'annotations.feather')):
+            if annotation.timestamp_ns == timestamp and annotation.category in CLASS_TO_LAYER_INDEX and CLASS_TO_LAYER_INDEX[annotation.category] in [3,4,5,6,9]:
+                    _, mask_3d_points = annotation.compute_interior_points(points_xy_wrt_src)
+                    center = annotation.xyz_center_m
+                    front = np.average(annotation.vertices_m[[0,1,2,3],:],0)
+                    left = np.average(annotation.vertices_m[[1,2,5,6],:],0)
+                    
+                    # See nuscenes_dataset.py:get_dynamic_objects for why this is the way it is
+                    
+                    segmentation = self.project_3d_point_values_onto_grid(
+                        points_xy_wrt_src,
+                        mask_3d_points,
+                        255*np.ones(shape=(points_xy_wrt_src.shape[0],)),
+                        segmentation
+                    )
+
+                    center_offset_3d = center.T - points_xy_wrt_src
+                    center_offset_3d = center_offset_3d[:, 0:2]
+                    center_offset = self.project_3d_point_values_onto_grid(
+                        points_xy_wrt_src,
+                        mask_3d_points,
+                        center_offset_3d,
+                        center_offset
+                    )
+
+                    sigma = 1
+                    center_score = self.project_3d_point_values_onto_grid(
+                        points_xy_wrt_src,
+                        mask_3d_points,
+                        np.exp(-(center_offset_3d ** 2).sum(-1) / (sigma ** 2)),
+                        center_score
+                    )
+
+                    # orientation, h/2, w/2
+                    orientation = np.zeros((points_xy_wrt_src.shape[0],2))
+                    orientation[mask_3d_points] = ((front - center) / (np.linalg.norm(front - center) + 1e-6))[0:2]
+                    center_o = self.project_3d_point_values_onto_grid(
+                        points_xy_wrt_src,
+                        mask_3d_points,
+                        orientation,
+                        center_o
+                    )
+
+                    height = np.zeros((points_xy_wrt_src.shape[0]))
+                    height[mask_3d_points] = np.linalg.norm(front - center) 
+                    center_h = self.project_3d_point_values_onto_grid(
+                        points_xy_wrt_src,
+                        mask_3d_points,
+                        height,
+                        center_h
+                    )
+
+                    width = np.zeros((points_xy_wrt_src.shape[0]))
+                    width[mask_3d_points] = np.linalg.norm(left - center)
+                    center_w = self.project_3d_point_values_onto_grid(
+                        points_xy_wrt_src,
+                        mask_3d_points,
+                        width,
+                        center_w
+                    )
+        segmentation = np.float32(segmentation[..., None])
+        center_score = center_score[..., None]
+        center_h = center_h[..., None]
+        center_w = center_w[..., None]
+
+        # import ipdb
+        # ipdb.sset_trace()
+        aux = np.concatenate((segmentation, center_score, center_offset, center_o, center_h, center_w), 2)
+
+        return aux
+
     def __len__(self):
         return len(self.samples)
 
@@ -278,14 +406,17 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
         # Additional labels for vehicles only.
         # aux, visibility = self.get_dynamic_objects(sample, anns_vehicle)
-        _, bev_masks = self.generate_bev(SE3(sample['pose'][:3, :3],sample['pose'][:3, 3]), sample['token'])
-        print(bev_masks.shape)
+        pose = np.asarray(sample['pose'],dtype=np.float32)
+        _, bev_masks = self.generate_bev(SE3(pose[:3, :3],pose[:3, 3]), sample['token'])
+
+        aux = self.get_aux_labels(sample['token'])
+        visibility = np.full((self.bev_info['h'], self.bev_info['w']), 255, dtype=np.uint8)
         # Package the data.
         data = Sample(
             view=self.view.tolist(),
             bev=bev_masks,
-            # aux=aux,
-            # visibility=visibility,
+            aux=aux,
+            visibility=visibility,
             **sample
         )
 

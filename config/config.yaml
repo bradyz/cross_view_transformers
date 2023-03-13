@@ -19,9 +19,9 @@ experiment:
 
 loader:
   batch_size: 4
-  num_workers: 1
-  pin_memory: False
-  prefetch_factor: 1
+  num_workers: 4
+  pin_memory: True
+  prefetch_factor: 4
 
 # AdamW
 optimizer:
@@ -42,7 +42,7 @@ trainer:
   max_steps: 30001
   log_every_n_steps: 10 # TODO: change back to 50
 
-  # gpus: -1
+  gpus: -1
   precision: 32
 
   limit_train_batches: 1.0

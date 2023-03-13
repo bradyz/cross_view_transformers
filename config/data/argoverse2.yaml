@@ -1,8 +1,8 @@
-dataset: 'argoverse2'                   # do not modify :)
+dataset: 'argoverse2_generated'                   # do not modify :)
 num_classes: 12                         # do not modify :)
 
 # used to get_split
-version: 'mini'                # or trainval
+version: 'trainval'                # 'mini' or 'trainval'
 dataset_dir: /srv/datasets/argoverse2/sensor
 labels_dir: /srv/share2/apatni30/cvt_labels_argoverse2
 
