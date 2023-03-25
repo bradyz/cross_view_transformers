@@ -57,8 +57,8 @@ def main(cfg):
     for split in ['train', 'val']:
         print(f'Generating split: {split}')
 
-        for episode in tqdm(data.get_split(split, loader=False), position=0, leave=False):
-            if Path(labels_dir / f'{episode.scene_name}.json').exists():
+        for episode in tqdm(data.get_split(split, loader=False, shuffle=True), position=0, leave=False):
+            if Path(labels_dir / f'{episode.scene_name}/').exists():
                 print(f"skipped {episode.scene_name}")
                 continue
             scene_dir = labels_dir / episode.scene_name

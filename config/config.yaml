@@ -39,8 +39,9 @@ scheduler:
 
 # lightning trainer
 trainer:
+  max_epochs: 10
   max_steps: 30001
-  log_every_n_steps: 10 # TODO: change back to 50
+  log_every_n_steps: 50
 
   gpus: -1
   precision: 32

@@ -11,3 +11,5 @@ outputs/
 wandb
 outputs
 *.git
+*.out
+*.err

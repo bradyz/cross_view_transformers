@@ -1,5 +1,5 @@
 dataset: 'argoverse2_generated'                   # do not modify :)
-num_classes: 12                         # do not modify :)
+num_classes: 11                        # do not modify :)
 
 # used to get_split
 version: 'trainval'                # 'mini' or 'trainval'
