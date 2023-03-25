@@ -38,6 +38,3 @@ class CrossViewTransformer(nn.Module):
         z = self.to_logits(y)
 
         return {k: z[:, start:stop] for k, (start, stop) in self.outputs.items()}
-
-# model = CrossViewTransformer()
-# num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

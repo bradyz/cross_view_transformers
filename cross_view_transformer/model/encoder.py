@@ -317,8 +317,6 @@ class Encoder(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(self, batch):
-        # print(batch.keys())
-        # print(batch)
         b, n, _, _, _ = batch['image'].shape
 
         image = batch['image'].flatten(0, 1)            # b n c h w

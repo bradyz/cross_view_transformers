@@ -11,7 +11,6 @@ from shapely.geometry import MultiPolygon
 from .common import INTERPOLATION, get_view_matrix, get_pose, get_split
 from .transforms import Sample, SaveDataTransform
 
-import ipdb
 
 STATIC = ['lane', 'road_segment']
 DIVIDER = ['road_divider', 'lane_divider']
@@ -209,8 +208,7 @@ class NuScenesDataset(torch.utils.data.Dataset):
         visibility = np.full((h, w), 255, dtype=np.uint8)
 
         coords = np.stack(np.meshgrid(np.arange(w), np.arange(h)), -1).astype(np.float32)
-        # import ipdb
-        # ipdb.sset_trace()
+
         for ann, p in zip(annotations, self.convert_to_box(sample, annotations)):
             box = p[:2, :4]
             center = p[:2, 4]

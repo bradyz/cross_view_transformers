@@ -69,8 +69,6 @@ class CenterLoss(SigmoidFocalLoss):
 
     def forward(self, pred, batch):
         pred = pred['center']
-        # import pdb
-        # pdb.set_trace()
         label = batch['center']
         loss = super().forward(pred, label)
 
