@@ -1,22 +1,17 @@
-import torch
-# import pyarrow.feather as feather
-from typing import List, Tuple, Any, Dict
-from PIL import Image
 import numpy as np
 import pandas as pd
-
 from pathlib import Path
-from .common import get_split, INTERPOLATION, get_view_matrix, get_pose
+import torch
+from typing import List, Tuple, Any, Dict
+
+from .common import get_split, get_view_matrix
 from .transforms import Sample, SaveDataTransform
 
-from av2.datasets.sensor.av2_sensor_dataloader import AV2SensorDataLoader
 from av2.datasets.sensor.sensor_dataloader import SensorDataloader
 from av2.datasets.sensor.constants import RingCameras, AnnotationCategories
 from av2.geometry.camera.pinhole_camera import PinholeCamera
-from av2.map.map_api import ArgoverseStaticMap, DrivableAreaMapLayer
 from av2.geometry.se3 import SE3
-from av2.geometry.geometry import compute_interior_points_mask
-from av2.rendering.rasterize import xyz_to_bev
+from av2.map.map_api import ArgoverseStaticMap
 from av2.structures.cuboid import CuboidList
 from av2.utils.io import read_city_SE3_ego, TimestampedCitySE3EgoPoses
 
@@ -65,11 +60,12 @@ CLASS_TO_LAYER_INDEX: Dict[Any,int] = {
     # AnnotationCategories.ANIMAL : 1,
     # AnnotationCategories.DOG : 1,
 }
-NUM_LAYERS = max(CLASS_TO_LAYER_INDEX.values())+1
+NUM_CLASSES = max(CLASS_TO_LAYER_INDEX.values())-min(CLASS_TO_LAYER_INDEX.values())+1
+
 COLORING = {
     0: (0,0,0),
     1: (105,105,105),
-    2: (0,0,0),
+    2: (255,255,255),
     3: (35,13,232),
     4: (157,30,150),
     5: (251,207,34),
@@ -91,12 +87,13 @@ def get_data(
     dataset="unused",  # ignore
     **dataset_kwargs,
 ):
+    assert num_classes == NUM_CLASSES
     dataset_dir = Path(dataset_dir)
     labels_dir = Path(labels_dir)
     transform = SaveDataTransform(labels_dir)
 
-    log_ids = get_split(f"mini_{split}" if version == "mini" else split, "argoverse2") # TODO: modify for argopaths (actually this seems fine)
-
+    log_ids = get_split(f"mini_{split}" if version == "mini" else split, "argoverse2")
+    
     sensor_dataloader = SensorDataloader(
             dataset_dir=dataset_dir,
             with_annotations=True,
@@ -146,8 +143,8 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         self.bev_shape = (bev['h'], bev['w'])
 
         # 3D Point Cloud around Vehicle
-        xpoints = np.linspace(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,num=self.bev_info['h']*2)
-        ypoints = np.linspace(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,num=self.bev_info['w']*2)
+        xpoints = np.linspace(-self.bev_info['h_meters']/2,self.bev_info['h_meters']/2,num=self.bev_info['h']*4)
+        ypoints = np.linspace(-self.bev_info['w_meters']/2,self.bev_info['w_meters']/2,num=self.bev_info['w']*4)
         zpoints = np.linspace(-1,4, num=15)
         self.points_xy_wrt_src = np.vstack([np.ravel(grid) for grid in np.meshgrid(xpoints, ypoints, zpoints)]).T
 
@@ -199,9 +196,6 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
                     ]
             # Ensure all these paths exist (edge case where some timestamps are negative?)
             if not all([path.exists() for path in image_paths]):
-                for path in image_paths:
-                    if not path.exists():
-                        print(path)
                 continue
 
             data.append(
@@ -323,7 +317,7 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         # Fill in pixels for image/mask
         for i in range(len(coloring)):
             im[y_img[layers_masks[i]==1], x_img[layers_masks[i]==1]] = coloring[i]
-            binary_semantic_seg[y_img[layers_masks[i]==1], x_img[layers_masks[i]==1], i] = 1
+            binary_semantic_seg[y_img[layers_masks[i]==1], x_img[layers_masks[i]==1], i] |= 1
 
         return im, 255*binary_semantic_seg
 
@@ -338,9 +332,8 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
         center_h = np.zeros((self.bev_info['h'], self.bev_info['w']), dtype=np.float32)
         center_w = np.zeros((self.bev_info['h'], self.bev_info['w']), dtype=np.float32)
 
-        # TODO: consider removing all non-ROI points (assuming everything else works this can save on computation) 
-        
-        layer_masks = np.zeros((NUM_LAYERS, points_xy_wrt_city.shape[0]))
+        # TODO: consider removing all non-ROI points (can save on computation) 
+        layer_masks = np.zeros((NUM_CLASSES, points_xy_wrt_city.shape[0]))
         
         drivable_area_raster = self.avm.raster_drivable_area_layer.get_raster_values_at_coords(points_xy_wrt_city, 0)
         layer_masks[1,drivable_area_raster==1] = 1
@@ -425,8 +418,8 @@ class Argoverse2Dataset(torch.utils.data.Dataset):
 
         # Additional labels for vehicles only.
         pose = np.asarray(sample['pose'],dtype=np.float32)
+               
         _, bev_masks, aux = self.generate_bev(SE3(pose[:3, :3],pose[:3, 3]), sample['token'])
-
         visibility = np.full((self.bev_info['h'], self.bev_info['w']), 255, dtype=np.uint8)
         # Package the data.
         data = Sample(
