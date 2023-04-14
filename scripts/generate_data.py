@@ -45,11 +45,11 @@ def main(cfg):
 
     data = setup_data_module(cfg)
     viz_fn = None
-
-    if 'visualization' in cfg:
-        viz_fn = setup_viz(cfg)
-        load_xform = LoadDataTransform(cfg.data.dataset_dir, cfg.data.labels_dir,
-                                       cfg.data.image, cfg.data.num_classes)
+    load_xform = None
+    # if 'visualization' in cfg:
+    #     viz_fn = setup_viz(cfg)
+    #     load_xform = LoadDataTransform(cfg.data.dataset_dir, cfg.data.labels_dir,
+    #                                    cfg.data.image, cfg.data.num_classes)
 
     labels_dir = Path(cfg.data.labels_dir)
     labels_dir.mkdir(parents=False, exist_ok=True)
@@ -57,14 +57,20 @@ def main(cfg):
     for split in ['train', 'val']:
         print(f'Generating split: {split}')
 
-        for episode in tqdm(data.get_split(split, loader=False), position=0, leave=False):
+        for episode in tqdm(data.get_split(split, loader=False, shuffle=True), position=0, leave=False):
+            if Path(labels_dir / f'{episode.scene_name}/').exists():
+                print(f"skipped {episode.scene_name}")
+                continue
             scene_dir = labels_dir / episode.scene_name
             scene_dir.mkdir(exist_ok=True, parents=False)
 
+            # Modify this line and remove the **cfg.loader to stop multithreading
             loader = torch.utils.data.DataLoader(episode, collate_fn=list, **cfg.loader)
+            # print("Episode: \n", episode)
             info = []
 
             for i, batch in enumerate(tqdm(loader, position=1, leave=False)):
+                # print("Batch: \n", batch)
                 info.extend(batch)
 
                 # Load data from disk to test if it was saved correctly
@@ -78,6 +84,7 @@ def main(cfg):
                     cv2.waitKey(1)
 
             # Write all info for loading to json
+            # print("WRITING THE DANG JSON!!!")
             scene_json = labels_dir / f'{episode.scene_name}.json'
             scene_json.write_text(json.dumps(info))
 

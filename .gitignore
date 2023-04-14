@@ -4,9 +4,15 @@ __pycache__/
 
 logs/
 outputs/
-
 .ipynb_checkpoints
 .vscode
 .idea
 wandb
 outputs
+
+# Slurm Batch Script files
+*.out
+*.err
+
+# output visualizations
+*.gif

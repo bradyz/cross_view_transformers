@@ -3,6 +3,7 @@ from pathlib import Path
 import logging
 import pytorch_lightning as pl
 import hydra
+import wandb
 
 from pytorch_lightning.strategies.ddp import DDPStrategy
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
@@ -50,6 +51,7 @@ def main(cfg):
         model_module.backbone = load_backbone(ckpt_path)
 
     # Loggers and callbacks
+    wandb.init(dir="/srv/share2/apatni30/tmp")
     logger = pl.loggers.WandbLogger(project=cfg.experiment.project,
                                     save_dir=cfg.experiment.save_dir,
                                     id=cfg.experiment.uuid)

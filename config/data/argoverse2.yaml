@@ -1,14 +1,13 @@
-dataset: 'nuscenes_generated'           # do not modify :)
-num_classes: 12                         # do not modify :)
+dataset: 'argoverse2_generated'                   # do not modify :)
+num_classes: 11                        # do not modify :)
 
 # used to get_split
-version: 'v1.0-trainval'                # 'v1.0-mini' for debugging
-# dataset_dir: /srv/share/datasets/nuScenes-v1.0
-dataset_dir: /srv/share/datasets/nuScenes-v1.0
-labels_dir: /srv/share2/apatni30/cvt_labels_nusclenes_bad
+version: 'trainval'                # 'mini' or 'trainval'
+dataset_dir: /srv/datasets/argoverse2/sensor
+labels_dir: /srv/share2/apatni30/cvt_labels_argoverse2
 
 # used to generate dataset
-cameras: [[0, 1, 2, 3, 4, 5]]
+cameras: [[0, 1, 2, 3, 4, 5, 6]]
 
 # required for train/eval
 # Takes the form [[i, j, ...], [p, q, ...]]
