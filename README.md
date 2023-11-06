@@ -130,7 +130,7 @@ To train a model,
 
 ```bash
 python3 scripts/train.py \
-  +experiment=cvt_nuscenes_vehicle
+  +experiment=cvt_nuscenes_vehicle \
   data.dataset_dir=/media/datasets/nuscenes \
   data.labels_dir=/media/datasets/cvt_labels_nuscenes
 ```
