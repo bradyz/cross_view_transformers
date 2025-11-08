@@ -9,7 +9,7 @@ defaults:
   - metrics: default_metrics
 
 experiment:
-  project: cross_view_transformers_test               # wandb project
+  project: nuscenes_Epipolar               # wandb project
   uuid: ${now:%m%d_%H%M%S}                            # model name
   save_dir: ${hydra:runtime.cwd}/logs/                # log directory, will be created
 
