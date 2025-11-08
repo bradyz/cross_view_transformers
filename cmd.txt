@@ -1,0 +1,12 @@
+python3 scripts/view_data.py \
+  data=nuscenes \
+  data.dataset_dir=/data/nuscenes \
+  data.labels_dir=/data/cvt_labels_nuscenes \
+  data.version=v1.0-mini \
+  visualization=nuscenes_viz \
+  +split=val
+
+python3 scripts/train.py \
+  +experiment=cvt_nuscenes_vehicle \
+  data.dataset_dir=/data/nuscenes \
+  data.labels_dir=/data/cvt_labels_nuscenes
